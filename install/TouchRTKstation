@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=TouchRTKStation
+Type=Application
+Exec=/usr/bin/python3 /home/pi/TouchRTKStation/TouchRTKStation_quitB_keyboard_option.py
+Terminal=false

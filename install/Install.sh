@@ -16,8 +16,7 @@ make
 
 # Install LCD Driver
 cd /home/pi/
-wget http://www.waveshare.com/w/upload/0/00/LCD-show-170703.tar.gz
-tar xzvf LCD*.tar.gz
+git clone https://github.com/waveshare/LCD-show.git
 cd ./LCD-show/
-chmod +x LCD4-show
-./LCD4-show
+chmod +x LCD5-show
+./LCD5-show

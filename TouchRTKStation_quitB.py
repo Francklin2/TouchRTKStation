@@ -167,21 +167,42 @@ class MainWidget(QWidget):
         fig=QPixmap(MainWindow.dirtrs+'/img/banner.png')
         bannar=QLabel(self)
         bannar.setPixmap(fig)
+        self.buttons = QHBoxLayout()
         self.tabs=QTabWidget()
 
         self.tabRover=QWidget()
         self.tabBase=QWidget()
 
+        self.quit_b = QPushButton('quitter')
+        self.shutdown_b = QPushButton('enteindre')
+
+        self.quit_b.clicked.connect(self.closeEvent)
+        self.shutdown_b.clicked.connect(self.shutdown)
+        
         self.tabs.addTab(self.tabRover,'Rover')
         self.tabs.addTab(self.tabBase,'Base')
+        self.buttons.addWidget(bannar)
+        self.buttons.addWidget(self.quit_b)
+        self.buttons.addWidget(self.shutdown_b)
 
         self.tabRoverUI()
         self.tabBaseUI()
 
         vbox=QVBoxLayout()
-        vbox.addWidget(bannar)
+        vbox.addLayout(self.buttons)
         vbox.addWidget(self.tabs)
         self.setLayout(vbox)
+
+    def closeEvent(self):
+        #Your desired functionality here
+        print('Close button pressed')
+        import sys
+        sys.exit(0)
+    def shutdown(self):
+        import os
+        print('oy')
+        os.system("shutdown now -h")
+
 
     def tabRoverUI(self):
         # Start button

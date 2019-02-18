@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 @author: Yusuke Takahashi, Taro Suzuki, Waseda University
@@ -10,11 +11,62 @@ from PyQt5.QtGui import QFont,QColor,QPixmap
 from PyQt5 import QtCore
 import telnetlib
 
-# Main Window
+import virtual_keyboard
+
+class MyLineEdit(QLineEdit):
+    def __init__(self,*args, **kwargs):
+        try:
+            super(MyLineEdit, self).__init__(*args, **kwargs)
+       
+            self.keyboard = virtual_keyboard.VirtualKeyboard()
+            self.keyboard.sigInputString.connect(self.updateTXT)
+
+        except Exception as e:
+            print(e)
+    def focusInEvent(self, event):
+        print('focus in event')
+        # do custom stuff
+        self.parent().setFocus()
+        self.keyboard.raise_()
+        self.keyboard.show()
+        super(MyLineEdit, self).focusInEvent(event)
+
+
+    def updateTXT(self,text):
+        print("a "+text)
+        self.setText(text)
+
+#chronometre
+class Chronometre(QLabel):
+    def __init__(self):
+        super().__init__()
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.tick)
+        self.seconde = 0
+        self.minute = 0
+        self.heure = 0
+        self.setText("Runnig for: \n 00:00:00")
+
+        
+    def start(self):
+        self.seconde = 0
+        self.minute = 0
+        self.heure = 0        
+        self.timer.start(1000)
+
+    def tick(self):
+        self.seconde+=1
+        if self.seconde == 60:
+            self.minute+=1
+            if self.minute == 60:
+                self.heure+=1
+        self.setText("Runnig for: \n {:02d}:{:02d}:{:02d}".format(self.heure,self.minute,self.seconde))
+        
 class MainWindow(QMainWindow):
     dirtrs = os.path.dirname(os.path.abspath(__file__))
     dirrtk = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 
+    # for god f sake
     # ublox command file for Base mode
     ubxcmd = dirtrs+'/conf/ubx_m8t_bds_raw_1hz.cmd'
 
@@ -49,7 +101,7 @@ class MainWindow(QMainWindow):
     corr_addr = 'rgp-ip.ign.fr'
     corr_port = '2101'
     corr_pw = 's3YfJx54C7'
-    corr_mp = 'FORC2'
+    corr_mp = 'TRS'
 
     # Default Log/Solution stream configration
     log_flag = True
@@ -68,7 +120,7 @@ class MainWindow(QMainWindow):
     output_addr = 'rgp-ip.ign.fr'
     output_port = '2101'
     output_pw = 's3YfJx54C7'
-    output_mp = 'TRS'
+    output_mp = 'FORC2'
 
     # Default Output(Serial) stream configration
     output2_flag = False
@@ -84,6 +136,83 @@ class MainWindow(QMainWindow):
     output2_iparity = 0
     output2_istopbits = 0
     output2_iflowcontrol = 0
+
+    with open("options.txt","r") as f:
+        options = f.readlines()
+
+    options2 =[]
+    for option in options:
+        options2.append(option.split('=')[-1].strip("\n"))
+        
+    ubxcmd,basepos_itype, basepos_lat,basepos_lon,basepos_hgt,input_iport,input_ibitrate,input_ibytesize,input_iparity,input_istopbits,input_iflowcontrol,\
+    corr_flag,corr_itype,corr_iformat,corr_user,corr_addr,corr_port,corr_pw,corr_mp,log_flag,sol_flag,dir,sol_filename,log_filename,output_flag,output_itype,\
+    output_iformat,output_user,output_addr,output_pw,output_mp,output2_flag,output2_port,output2_iport,output2_ibitrate,output2_ibytesize,output2_iparity,\
+    output2_istopbits,output2_iflowcontrol = options2
+
+    print(options2)
+    try:
+        # ublox command file for Base mode
+        ubxcmd = dirtrs+ubxcmd
+
+        #conversion des int du str vers int
+        basepos_itype=int(basepos_itype)
+        input_iport=int(input_iport)
+        input_ibitrate=int(input_ibitrate)
+        input_ibytesize=int(input_ibytesize)
+        input_iparity=int(input_iparity)
+        input_istopbits=int(input_istopbits)
+        input_iflowcontrol=int(input_iflowcontrol)
+        corr_itype=int(corr_itype)
+        corr_iformat=int(corr_iformat)
+        output_itype=int(output_itype)
+        output2_iport=int(output2_iport)
+        output2_ibitrate=int(output2_ibitrate)
+        output2_iport=int(output2_iport)
+        output2_ibytesize=int(output2_ibytesize)
+        output2_iparity=int(output2_iparity)
+        output2_istopbits=int(output2_istopbits)
+        output2_iflowcontrol=int(output2_iflowcontrol)
+            
+        # Default Base position configuration
+        basepos_type=(['LLH','RTCM'])
+        
+        # Default Input stream configration
+        input_port = (['serial0','serial1','ttyACM0','ttyACM1','ttyUSB0','ttyUSB1'])
+        input_bitrate = (['300','600','1200','2400','4800','9600','19200','38400','57600','115200','230400'])
+        input_bytesize = (['7 bits','8 bits'])   #[7 8]
+        input_parity = (['None','Even','Odd'])   #[n e o]
+        input_stopbits = (['1 bit','2 bits'])    #[1 2]
+        input_flowcontrol = (['None','RTS/CTS']) #[off rtscts]
+        
+        # Default Correction stream configration
+        corr_flag = (corr_flag=='True')
+        corr_type=(['NTRIP Client','TCP Client'])
+        corr_format=(['RTCM2','RTCM3','BINEX','UBX'])
+        
+        # Default Log/Solution stream configration
+        log_flag = (log_flag=='True')
+        sol_flag = (sol_flag=='True')
+        dir = glob.glob(dir)
+        if len(dir)==0:
+            dir = [dirtrs+'/']
+        sol_filename = dir[0]+sol_filename
+        log_filename = dir[0]+log_filename 
+
+        # Default Output stream configration
+        output_flag = (output_flag=='True')
+        output_type=(['TCP Server','NTRIP Server','NTRIP Caster'])
+        output_format=(['UBX','RTCM3'])
+        
+        # Default Output(Serial) stream configration
+        output2_flag =(output2_flag=='True')
+        output2_port = (['serial0','serial1','ttyACM0','ttyACM1','ttyUSB0','ttyUSB1'])
+        output2_bitrate = (['300','600','1200','2400','4800','9600','19200','38400','57600','115200','230400'])
+        output2_bytesize = (['7 bits','8 bits'])   #[7 8]
+        output2_parity = (['None','Even','Odd'])   #[n e o]
+        output2_stopbits = (['1 bit','2 bits'])    #[1 2]
+        output2_flowcontrol = (['None','RTS/CTS']) #[off rtscts]
+    except Exception as e:
+        print(e)
 
     def __init__(self):
         super().__init__()
@@ -162,26 +291,51 @@ class MainWidget(QWidget):
         self.initUI()
 
     def initUI(self):
-        self.setFont(QFont('Helvetica',11))
+        self.setFont(QFont('Helvetica',18))
 
         fig=QPixmap(MainWindow.dirtrs+'/img/banner.png')
         bannar=QLabel(self)
         bannar.setPixmap(fig)
+        self.buttons = QHBoxLayout()
         self.tabs=QTabWidget()
 
         self.tabRover=QWidget()
         self.tabBase=QWidget()
 
+        self.quit_b = QPushButton('quitter')
+        self.quit_b.resize(70,49)
+        self.quit_b.setMinimumSize(70, 49)
+        self.shutdown_b = QPushButton('enteindre')
+        self.shutdown_b.resize(70,49)
+        self.shutdown_b.setMinimumSize(70, 49)
+
+        self.quit_b.clicked.connect(self.closeEvent)
+        self.shutdown_b.clicked.connect(self.shutdown)
+        
         self.tabs.addTab(self.tabRover,'Rover')
         self.tabs.addTab(self.tabBase,'Base')
+        self.buttons.addWidget(bannar)
+        self.buttons.addWidget(self.quit_b)
+        self.buttons.addWidget(self.shutdown_b)
 
         self.tabRoverUI()
         self.tabBaseUI()
 
         vbox=QVBoxLayout()
-        vbox.addWidget(bannar)
+        vbox.addLayout(self.buttons)
         vbox.addWidget(self.tabs)
         self.setLayout(vbox)
+
+    def closeEvent(self):
+        #Your desired functionality here
+        print('Close button pressed')
+        import sys
+        sys.exit(0)
+    def shutdown(self):
+        import os
+        print('oy')
+        os.system("shutdown now -h")
+
 
     def tabRoverUI(self):
         # Start button
@@ -189,15 +343,15 @@ class MainWidget(QWidget):
         self.start_rov.setCheckable(True)
         self.start_rov.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Expanding)
         self.start_rov.toggled.connect(self.startRoverToggled)
-        self.start_rov.setFont(QFont('Helvetica',16))
+        self.start_rov.setFont(QFont('Helvetica',18))
         # Config button
         self.config_rov = QPushButton('Config',self)
         self.config_rov.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Expanding)
         self.config_rov.clicked.connect(self.makeRoverConfig)
-        self.config_rov.setFont(QFont('Helvetica',16))
+        self.config_rov.setFont(QFont('Helvetica',18))
         # Command window
         self.status_rov = QLabel('')
-        self.status_rov.setFont(QFont('Helvetica',11))
+        self.status_rov.setFont(QFont('Helvetica',18))
         scroll=QScrollArea()
         scroll.setFrameShape(False)
         scroll.setWidgetResizable(True)
@@ -207,8 +361,14 @@ class MainWidget(QWidget):
         fig=QPixmap(MainWindow.dirtrs+'/img/rover.png')
         icon=QLabel(self)
         icon.setPixmap(fig)
+
+        #Chrono added by ENSG
+
+        self.chrono_rover = Chronometre()
+
         # Layout
         hbox1 = QHBoxLayout()
+        hbox1_bis = QVBoxLayout()
         hbox2 = QHBoxLayout()
         hbox3 = QHBoxLayout()
         vbox1_1 = QVBoxLayout()
@@ -218,9 +378,12 @@ class MainWidget(QWidget):
         vbox = QVBoxLayout()
         # hbox1
         hbox1.addSpacing(10)
-        hbox1.addWidget(icon)
+        hbox1_bis.addWidget(icon)
         hbox1.addSpacing(10)
+        hbox1_bis.addWidget(self.chrono_rover)
 
+        hbox1.addLayout(hbox1_bis)
+        
         self.mode_spp = QPushButton('Single',self)
         self.mode_spp.setCheckable(True)
         self.mode_spp.toggle()
@@ -277,8 +440,12 @@ class MainWidget(QWidget):
 
     def makeRoverConfig(self):
         pass
-        subWindow=RoverConfigWindow(self)
-        subWindow.show()
+        try:
+            print("a")
+            subWindow=RoverConfigWindow(self)
+            subWindow.show()
+        except Exception as e:
+            print(e)
 
     def tabBaseUI(self):
         # Start button
@@ -286,15 +453,15 @@ class MainWidget(QWidget):
         self.start_base.setCheckable(True)
         self.start_base.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Expanding)
         self.start_base.toggled.connect(self.startBaseToggled)
-        self.start_base.setFont(QFont('Helvetica',16))
+        self.start_base.setFont(QFont('Helvetica',18))
         # Config button
         self.config_base = QPushButton('Config',self)
         self.config_base.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Expanding)
         self.config_base.clicked.connect(self.makeBaseConfig)
-        self.config_base.setFont(QFont('Helvetica',16))
+        self.config_base.setFont(QFont('Helvetica',18))
         # Command window
         self.status_base = QLabel('')
-        self.status_base.setFont(QFont('Helvetica',11))
+        self.status_base.setFont(QFont('Helvetica',18))
         scroll=QScrollArea()
         scroll.setFrameShape(False)
         scroll.setWidgetResizable(True)
@@ -344,6 +511,7 @@ class MainWidget(QWidget):
     # Start Rover button
     def startRoverToggled(self,checked):
         if checked:
+            self.chrono_rover.start()
             self.start_rov.setText('Stop')
             self.mode_spp.setDisabled(True)
             self.mode_rtks.setDisabled(True)
@@ -588,10 +756,10 @@ class MainWidget(QWidget):
 class RoverConfigWindow:
     def __init__(self, parent=None):
         self.w = QDialog(parent)
-        self.w.setFont(QFont('Helvetica',11))
+        self.w.setFont(QFont('Helvetica',18))
 
         self.w.setWindowFlags(QtCore.Qt.FramelessWindowHint)
-        self.w.setGeometry(0, 0, 480, 320)
+        self.w.setGeometry(0, 0, 700, 500)
 
         self.parent = parent
 
@@ -658,7 +826,7 @@ class RoverConfigWindow:
 class BaseConfigWindow:
     def __init__(self, parent=None):
         self.w = QDialog(parent)
-        self.w.setFont(QFont('Helvetica',11))
+        self.w.setFont(QFont('Helvetica',18))
 
         self.w.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.w.setGeometry(0, 0, 480, 320)
@@ -793,11 +961,11 @@ class CorrectionConfig(QWidget):
         self.format_list.setCurrentIndex(MainWindow.corr_iformat)
 
         self.corr_b.setChecked(MainWindow.corr_flag)
-        self.addr_edit=QLineEdit(MainWindow.corr_addr,self)
-        self.port_edit=QLineEdit(MainWindow.corr_port,self)
-        self.mp_edit=QLineEdit(MainWindow.corr_mp,self)
-        self.user_edit=QLineEdit(MainWindow.corr_user,self)
-        self.pw_edit=QLineEdit(MainWindow.corr_pw,self)
+        self.addr_edit=MyLineEdit(MainWindow.corr_addr,self)
+        self.port_edit=MyLineEdit(MainWindow.corr_port,self)
+        self.mp_edit=MyLineEdit(MainWindow.corr_mp,self)
+        self.user_edit=MyLineEdit(MainWindow.corr_user,self)
+        self.pw_edit=MyLineEdit(MainWindow.corr_pw,self)
 
         grid=QGridLayout()
         grid.addWidget(self.corr_b,0,0)
@@ -845,11 +1013,11 @@ class OutputConfig(QWidget):
         self.format_list.setCurrentIndex(MainWindow.output_iformat)
 
         self.output_b.setChecked(MainWindow.output_flag)
-        self.addr_edit=QLineEdit(MainWindow.output_addr,self)
-        self.port_edit=QLineEdit(MainWindow.output_port,self)
-        self.mp_edit=QLineEdit(MainWindow.output_mp,self)
-        self.user_edit=QLineEdit(MainWindow.output_user,self)
-        self.pw_edit=QLineEdit(MainWindow.output_pw,self)
+        self.addr_edit=MyLineEdit(MainWindow.output_addr,self)
+        self.port_edit=MyLineEdit(MainWindow.output_port,self)
+        self.mp_edit=MyLineEdit(MainWindow.output_mp,self)
+        self.user_edit=MyLineEdit(MainWindow.output_user,self)
+        self.pw_edit=MyLineEdit(MainWindow.output_pw,self)
 
         grid=QGridLayout()
         grid.addWidget(self.output_b,0,0)
@@ -963,7 +1131,7 @@ class SolConfig(QWidget):
     def initSolUI(self):
         self.sol_b = QCheckBox("Enable",self)
         self.sol_b.setChecked(MainWindow.sol_flag)
-        self.output_edit=QLineEdit(MainWindow.sol_filename)
+        self.output_edit=MyLineEdit(MainWindow.sol_filename)
 
         grid=QGridLayout()
         grid.addWidget(self.sol_b,0,0)
@@ -980,7 +1148,7 @@ class LogConfig(QWidget):
     def initLogUI(self):
         self.log_b = QCheckBox("Enable",self)
         self.log_b.setChecked(MainWindow.log_flag)
-        self.output_edit=QLineEdit(MainWindow.log_filename)
+        self.output_edit=MyLineEdit(MainWindow.log_filename)
 
         grid=QGridLayout()
         grid.addWidget(self.log_b,0,0)
@@ -1000,9 +1168,9 @@ class BasePosConfig_Rover(QWidget):
         self.type_list.setCurrentIndex(MainWindow.basepos_itype)
         self.type_list.currentIndexChanged.connect(self.typeChanged)
 
-        self.lat_edit=QLineEdit(MainWindow.basepos_lat)
-        self.lon_edit=QLineEdit(MainWindow.basepos_lon)
-        self.hgt_edit=QLineEdit(MainWindow.basepos_hgt)
+        self.lat_edit=MyLineEdit(MainWindow.basepos_lat)
+        self.lon_edit=MyLineEdit(MainWindow.basepos_lon)
+        self.hgt_edit=MyLineEdit(MainWindow.basepos_hgt)
 
         grid=QGridLayout()
         grid.addWidget(QLabel('Base Position Type'),0,0)
@@ -1034,9 +1202,9 @@ class BasePosConfig_Base(QWidget):
         self.initBasePosUI()
 
     def initBasePosUI(self):
-        self.lat_edit=QLineEdit(MainWindow.basepos_lat)
-        self.lon_edit=QLineEdit(MainWindow.basepos_lon)
-        self.hgt_edit=QLineEdit(MainWindow.basepos_hgt)
+        self.lat_edit=MyLineEdit(MainWindow.basepos_lat)
+        self.lon_edit=MyLineEdit(MainWindow.basepos_lon)
+        self.hgt_edit=MyLineEdit(MainWindow.basepos_hgt)
 
         grid=QGridLayout()
         grid.addWidget(QLabel('Latitude (deg)'),0,0)

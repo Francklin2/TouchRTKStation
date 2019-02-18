@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 @author: Yusuke Takahashi, Taro Suzuki, Waseda University
@@ -10,6 +11,59 @@ from PyQt5.QtGui import QFont,QColor,QPixmap
 from PyQt5 import QtCore
 import telnetlib
 
+import virtual_keyboard
+
+class MyLineEdit(QLineEdit):
+    def __init__(self,*args, **kwargs):
+        try:
+            super(MyLineEdit, self).__init__(*args, **kwargs)
+       
+            self.keyboard = virtual_keyboard.VirtualKeyboard()
+            self.keyboard.sigInputString.connect(self.updateTXT)
+
+        except Exception as e:
+            print(e)
+    def focusInEvent(self, event):
+        print('focus in event')
+        # do custom stuff
+        self.parent().setFocus()
+        self.keyboard.raise_()
+        self.keyboard.show()
+        super(MyLineEdit, self).focusInEvent(event)
+
+
+    def updateTXT(self,text):
+        print("a "+text)
+        self.setText(text)
+
+#chronometre
+class Chronometre(QLabel):
+    def __init__(self):
+        super().__init__()
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.tick)
+        self.seconde = 0
+        self.minute = 0
+        self.heure = 0
+        self.setText("Runnig for: \n 00:00:00")
+
+        
+    def start(self):
+        self.seconde = 0
+        self.minute = 0
+        self.heure = 0        
+        self.timer.start(1000)
+
+    def tick(self):
+        self.seconde+=1
+        if self.seconde == 60:
+            self.minute+=1
+            if self.minute == 60:
+                self.heure+=1
+        self.setText("Runnig for: \n {:02d}:{:02d}:{:02d}".format(self.heure,self.minute,self.seconde))
+        
+        
+        
 # Main Window
 class MainWindow(QMainWindow):
     dirtrs = os.path.dirname(os.path.abspath(__file__))
@@ -162,26 +216,51 @@ class MainWidget(QWidget):
         self.initUI()
 
     def initUI(self):
-        self.setFont(QFont('Helvetica',11))
+        self.setFont(QFont('Helvetica',18))
 
         fig=QPixmap(MainWindow.dirtrs+'/img/banner.png')
         bannar=QLabel(self)
         bannar.setPixmap(fig)
+        self.buttons = QHBoxLayout()
         self.tabs=QTabWidget()
 
         self.tabRover=QWidget()
         self.tabBase=QWidget()
 
+        self.quit_b = QPushButton('quitter')
+        self.quit_b.resize(70,49)
+        self.quit_b.setMinimumSize(70, 49)
+        self.shutdown_b = QPushButton('enteindre')
+        self.shutdown_b.resize(70,49)
+        self.shutdown_b.setMinimumSize(70, 49)
+
+        self.quit_b.clicked.connect(self.closeEvent)
+        self.shutdown_b.clicked.connect(self.shutdown)
+        
         self.tabs.addTab(self.tabRover,'Rover')
         self.tabs.addTab(self.tabBase,'Base')
+        self.buttons.addWidget(bannar)
+        self.buttons.addWidget(self.quit_b)
+        self.buttons.addWidget(self.shutdown_b)
 
         self.tabRoverUI()
         self.tabBaseUI()
 
         vbox=QVBoxLayout()
-        vbox.addWidget(bannar)
+        vbox.addLayout(self.buttons)
         vbox.addWidget(self.tabs)
         self.setLayout(vbox)
+
+    def closeEvent(self):
+        #Your desired functionality here
+        print('Close button pressed')
+        import sys
+        sys.exit(0)
+    def shutdown(self):
+        import os
+        print('oy')
+        os.system("shutdown now -h")
+
 
     def tabRoverUI(self):
         # Start button
@@ -189,15 +268,15 @@ class MainWidget(QWidget):
         self.start_rov.setCheckable(True)
         self.start_rov.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Expanding)
         self.start_rov.toggled.connect(self.startRoverToggled)
-        self.start_rov.setFont(QFont('Helvetica',16))
+        self.start_rov.setFont(QFont('Helvetica',18))
         # Config button
         self.config_rov = QPushButton('Config',self)
         self.config_rov.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Expanding)
         self.config_rov.clicked.connect(self.makeRoverConfig)
-        self.config_rov.setFont(QFont('Helvetica',16))
+        self.config_rov.setFont(QFont('Helvetica',18))
         # Command window
         self.status_rov = QLabel('')
-        self.status_rov.setFont(QFont('Helvetica',11))
+        self.status_rov.setFont(QFont('Helvetica',18))
         scroll=QScrollArea()
         scroll.setFrameShape(False)
         scroll.setWidgetResizable(True)
@@ -207,8 +286,14 @@ class MainWidget(QWidget):
         fig=QPixmap(MainWindow.dirtrs+'/img/rover.png')
         icon=QLabel(self)
         icon.setPixmap(fig)
+
+        #Chrono added by ENSG
+
+        self.chrono_rover = Chronometre()
+
         # Layout
         hbox1 = QHBoxLayout()
+        hbox1_bis = QVBoxLayout()
         hbox2 = QHBoxLayout()
         hbox3 = QHBoxLayout()
         vbox1_1 = QVBoxLayout()
@@ -218,9 +303,12 @@ class MainWidget(QWidget):
         vbox = QVBoxLayout()
         # hbox1
         hbox1.addSpacing(10)
-        hbox1.addWidget(icon)
+        hbox1_bis.addWidget(icon)
         hbox1.addSpacing(10)
+        hbox1_bis.addWidget(self.chrono_rover)
 
+        hbox1.addLayout(hbox1_bis)
+        
         self.mode_spp = QPushButton('Single',self)
         self.mode_spp.setCheckable(True)
         self.mode_spp.toggle()
@@ -286,15 +374,15 @@ class MainWidget(QWidget):
         self.start_base.setCheckable(True)
         self.start_base.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Expanding)
         self.start_base.toggled.connect(self.startBaseToggled)
-        self.start_base.setFont(QFont('Helvetica',16))
+        self.start_base.setFont(QFont('Helvetica',18))
         # Config button
         self.config_base = QPushButton('Config',self)
         self.config_base.setSizePolicy(QSizePolicy.Expanding,QSizePolicy.Expanding)
         self.config_base.clicked.connect(self.makeBaseConfig)
-        self.config_base.setFont(QFont('Helvetica',16))
+        self.config_base.setFont(QFont('Helvetica',18))
         # Command window
         self.status_base = QLabel('')
-        self.status_base.setFont(QFont('Helvetica',11))
+        self.status_base.setFont(QFont('Helvetica',18))
         scroll=QScrollArea()
         scroll.setFrameShape(False)
         scroll.setWidgetResizable(True)
@@ -344,6 +432,7 @@ class MainWidget(QWidget):
     # Start Rover button
     def startRoverToggled(self,checked):
         if checked:
+            self.chrono_rover.start()
             self.start_rov.setText('Stop')
             self.mode_spp.setDisabled(True)
             self.mode_rtks.setDisabled(True)
@@ -588,10 +677,10 @@ class MainWidget(QWidget):
 class RoverConfigWindow:
     def __init__(self, parent=None):
         self.w = QDialog(parent)
-        self.w.setFont(QFont('Helvetica',11))
+        self.w.setFont(QFont('Helvetica',18))
 
         self.w.setWindowFlags(QtCore.Qt.FramelessWindowHint)
-        self.w.setGeometry(0, 0, 480, 320)
+        self.w.setGeometry(0, 0, 700, 500)
 
         self.parent = parent
 
@@ -658,7 +747,7 @@ class RoverConfigWindow:
 class BaseConfigWindow:
     def __init__(self, parent=None):
         self.w = QDialog(parent)
-        self.w.setFont(QFont('Helvetica',11))
+        self.w.setFont(QFont('Helvetica',18))
 
         self.w.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.w.setGeometry(0, 0, 480, 320)
@@ -793,11 +882,11 @@ class CorrectionConfig(QWidget):
         self.format_list.setCurrentIndex(MainWindow.corr_iformat)
 
         self.corr_b.setChecked(MainWindow.corr_flag)
-        self.addr_edit=QLineEdit(MainWindow.corr_addr,self)
-        self.port_edit=QLineEdit(MainWindow.corr_port,self)
-        self.mp_edit=QLineEdit(MainWindow.corr_mp,self)
-        self.user_edit=QLineEdit(MainWindow.corr_user,self)
-        self.pw_edit=QLineEdit(MainWindow.corr_pw,self)
+        self.addr_edit=MyLineEdit(MainWindow.corr_addr,self)
+        self.port_edit=MyLineEdit(MainWindow.corr_port,self)
+        self.mp_edit=MyLineEdit(MainWindow.corr_mp,self)
+        self.user_edit=MyLineEdit(MainWindow.corr_user,self)
+        self.pw_edit=MyLineEdit(MainWindow.corr_pw,self)
 
         grid=QGridLayout()
         grid.addWidget(self.corr_b,0,0)
@@ -845,11 +934,11 @@ class OutputConfig(QWidget):
         self.format_list.setCurrentIndex(MainWindow.output_iformat)
 
         self.output_b.setChecked(MainWindow.output_flag)
-        self.addr_edit=QLineEdit(MainWindow.output_addr,self)
-        self.port_edit=QLineEdit(MainWindow.output_port,self)
-        self.mp_edit=QLineEdit(MainWindow.output_mp,self)
-        self.user_edit=QLineEdit(MainWindow.output_user,self)
-        self.pw_edit=QLineEdit(MainWindow.output_pw,self)
+        self.addr_edit=MyLineEdit(MainWindow.output_addr,self)
+        self.port_edit=MyLineEdit(MainWindow.output_port,self)
+        self.mp_edit=MyLineEdit(MainWindow.output_mp,self)
+        self.user_edit=MyLineEdit(MainWindow.output_user,self)
+        self.pw_edit=MyLineEdit(MainWindow.output_pw,self)
 
         grid=QGridLayout()
         grid.addWidget(self.output_b,0,0)
@@ -963,7 +1052,7 @@ class SolConfig(QWidget):
     def initSolUI(self):
         self.sol_b = QCheckBox("Enable",self)
         self.sol_b.setChecked(MainWindow.sol_flag)
-        self.output_edit=QLineEdit(MainWindow.sol_filename)
+        self.output_edit=MyLineEdit(MainWindow.sol_filename)
 
         grid=QGridLayout()
         grid.addWidget(self.sol_b,0,0)
@@ -980,7 +1069,7 @@ class LogConfig(QWidget):
     def initLogUI(self):
         self.log_b = QCheckBox("Enable",self)
         self.log_b.setChecked(MainWindow.log_flag)
-        self.output_edit=QLineEdit(MainWindow.log_filename)
+        self.output_edit=MyLineEdit(MainWindow.log_filename)
 
         grid=QGridLayout()
         grid.addWidget(self.log_b,0,0)
@@ -1000,9 +1089,9 @@ class BasePosConfig_Rover(QWidget):
         self.type_list.setCurrentIndex(MainWindow.basepos_itype)
         self.type_list.currentIndexChanged.connect(self.typeChanged)
 
-        self.lat_edit=QLineEdit(MainWindow.basepos_lat)
-        self.lon_edit=QLineEdit(MainWindow.basepos_lon)
-        self.hgt_edit=QLineEdit(MainWindow.basepos_hgt)
+        self.lat_edit=MyLineEdit(MainWindow.basepos_lat)
+        self.lon_edit=MyLineEdit(MainWindow.basepos_lon)
+        self.hgt_edit=MyLineEdit(MainWindow.basepos_hgt)
 
         grid=QGridLayout()
         grid.addWidget(QLabel('Base Position Type'),0,0)
@@ -1034,9 +1123,9 @@ class BasePosConfig_Base(QWidget):
         self.initBasePosUI()
 
     def initBasePosUI(self):
-        self.lat_edit=QLineEdit(MainWindow.basepos_lat)
-        self.lon_edit=QLineEdit(MainWindow.basepos_lon)
-        self.hgt_edit=QLineEdit(MainWindow.basepos_hgt)
+        self.lat_edit=MyLineEdit(MainWindow.basepos_lat)
+        self.lon_edit=MyLineEdit(MainWindow.basepos_lon)
+        self.hgt_edit=MyLineEdit(MainWindow.basepos_hgt)
 
         grid=QGridLayout()
         grid.addWidget(QLabel('Latitude (deg)'),0,0)
